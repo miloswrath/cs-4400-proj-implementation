@@ -1,0 +1,32 @@
+services:
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+    image: app-mysql-initialized
+    container_name: app-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: PT_Clinic
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: appsecret
+    ports:
+      - "3306:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uappuser", "-pappsecret"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # (optional) DB admin UI
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  dbdata:
