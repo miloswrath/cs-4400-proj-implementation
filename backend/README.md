@@ -17,6 +17,7 @@ Express + TypeScript service that powers the demo patient portal. It exposes aut
 3. **Therapists** — `/therapists` and `/therapists/:therapistId/availability` expose staff plus available hourly slots (08:00–16:00).
 4. **Scheduling** — `/patients/:patientId/sessions` (GET/POST) and `/patients/:patientId/sessions/:sessionId` (PATCH) enforce business rules like “one patient session per day” and “no overlapping therapist slots.”
 5. **Health** — `/health` pings the DB and reports readiness so Docker/ops checks can verify uptime.
+6. **Admin metrics** — `/admin/metrics` aggregates no-show rate by therapist/month, outcome score deltas, and top shoulder exercise prescriptions plus the detailed records the dashboard modals display.
 
 Because everything runs on top of seeded demo data, be explicit with stakeholders that the portal is illustrative only. Never point it at real PHI without the proper compliance review.
 
@@ -33,7 +34,7 @@ DB_NAME=PT_Clinic
 CORS_ORIGIN=http://localhost:5173
 ```
 
-`CORS_ORIGIN` accepts a comma-separated list when you need to allow multiple frontends.
+`CORS_ORIGIN` accepts a comma-separated list when you need to allow multiple frontends. The default admin login can be overridden with `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars (defaults: `admin` / `AA**AA`).
 
 ## Available scripts
 - `npm run dev` — Watches `src/` and runs `ts-node` via `nodemon`.
@@ -46,6 +47,7 @@ CORS_ORIGIN=http://localhost:5173
 The repo includes:
 - `sql/00_app_user.sql` — ensures the `appuser/appsecret` MySQL account exists.
 - `sql/create_tables.sql` — creates all tables and inserts the fictional patients, staff, therapists, referrals, outcome measures, and sessions used by the app.
+- `backend/sql/admin_seed.sql` — adds deeper shoulder exercise data, multi-month sessions, and outcome histories so the admin dashboard always has something to chart.
 - `Dockerfile.db` + `docker-compose.yml` — build a MySQL container that automatically runs the SQL scripts above the first time it starts.
 
-If you need to reset everything, stop the containers, run `docker compose down -v`, and start them again with `docker compose up -d`.
+If you need to reset everything, stop the containers, run `docker compose down -v`, and start them again with `docker compose up -d`. The backend also seeds/updates the admin account and analytics dataset every time it boots, so developers using an existing database still get the same demo experience.

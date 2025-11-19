@@ -4,7 +4,7 @@ Patient-facing single-page app built with modern React. It handles sign-up, onbo
 
 ## Tools and how we use them
 - **React 19 + TypeScript** — component authoring and type safety. Hooks + strict typing help us catch invalid UI states before they hit the API.
-- **React Router v7** — client-side pages (`/`, `/onboarding`, `/patient`). Routing and `<Navigate>` gates enforce role-based flows (pending patients go through onboarding, etc.).
+- **React Router v7** — client-side pages (`/`, `/onboarding`, `/patient`, `/admin`). Routing and `<Navigate>` gates enforce role-based flows (pending patients go through onboarding, admins land on their dashboard, etc.).
 - **Context API (`AuthContext`)** — keeps the logged-in user object in memory so every component knows whether to show sign-in, onboarding, or the dashboard.
 - **Vite 7** — dev server and build pipeline. Vite proxies API calls during `npm run dev` and outputs an optimized bundle for production-like runs.
 - **Modern CSS modules** — each page/component owns a `.css` file that scopes styling without bringing in a heavyweight design system. Utility classes like `eyebrow` keep typography consistent.
@@ -16,6 +16,7 @@ Patient-facing single-page app built with modern React. It handles sign-up, onbo
    - `ScheduleSession` to request a visit, validate time slots, and submit `/patients/:id/sessions`.
    - `UpcomingSessions` to show scheduled visits and open the inline editor.
    - `SessionEditor` overlay for rescheduling, updating status, pain scale, and notes via `PATCH /patients/:id/sessions/:sessionId`.
+4. **Admin dashboard** — `pages/AdminHome` fetches `/admin/metrics` and renders no-show rates, outcome deltas, and top shoulder exercises. Each card opens a modal with deeper context (full outcome histories or the list of patients/therapists tied to that exercise order).
 
 Because the backing data is seeded with fake names and appointments, you can safely explore flows without touching real PHI. Feel free to create as many dummy accounts as you need for demos.
 
@@ -25,6 +26,7 @@ npm install
 npm run dev
 ```
 Create a `frontend/.env` file with `VITE_API_BASE_URL=http://localhost:4000` (or the URL where the backend runs). Vite will print the local URL to open in your browser.
+Use the default admin credentials (`admin` / `AA**AA`) once the backend is running to preview the analytics dashboard.
 
 ## Building for production
 ```bash
