@@ -2,3 +2,4 @@ FROM mysql:8.3
 
 # Copy the schema/seed script so the MySQL entrypoint runs it on first boot.
 COPY sql/create_tables.sql /docker-entrypoint-initdb.d/01_create_tables.sql
+COPY backend/sql/admin_seed.sql /docker-entrypoint-initdb.d/02_admin_seed.sql

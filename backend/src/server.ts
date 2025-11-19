@@ -77,6 +77,46 @@ type PatientSessionRow = RowDataPacket & {
   Specialty: string | null;
 };
 
+type NoShowRateRow = RowDataPacket & {
+  TherapistID: number;
+  StaffName: string;
+  MonthLabel: string;
+  NoShows: number;
+  TotalSessions: number;
+};
+
+type OutcomeChangeRow = RowDataPacket & {
+  PatientID: number;
+  PatientName: string;
+  MeasureName: string;
+  BaselineScore: number | null;
+  LatestScore: number | null;
+  Delta: number | null;
+};
+
+type ShoulderExerciseMetricRow = RowDataPacket & {
+  ExerciseName: string;
+  Prescriptions: number;
+};
+
+type OutcomeDetailRow = RowDataPacket & {
+  OutcomeID: number;
+  PatientID: number;
+  PatientName: string;
+  MeasureName: string;
+  Score: number;
+  TakenOn: string;
+  Notes: string | null;
+};
+
+type ShoulderExerciseOrderRow = RowDataPacket & {
+  ExerciseName: string;
+  SessionID: number;
+  SessionDate: string;
+  PatientName: string;
+  TherapistName: string;
+};
+
 const SCHEDULING_START_HOUR = 8;
 const SCHEDULING_END_HOUR = 16;
 
@@ -104,6 +144,104 @@ function normalizeTimeInput(time: unknown): string | null {
 }
 
 const SESSION_STATUSES = new Set(['Scheduled', 'Completed', 'Canceled', 'No-Show']);
+
+type UserIdRow = RowDataPacket & {
+  UserID: number;
+};
+
+const DEFAULT_ADMIN_USERNAME = (process.env.ADMIN_USERNAME ?? 'admin').trim().toLowerCase();
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'AA**AA';
+const ADMIN_SEED_EXERCISES_SQL = `
+INSERT INTO Exercises (ExerciseID, Name, BodyRegion, Difficulty)
+VALUES
+  (6, 'Sleeper Stretch', 'Shoulder', 2),
+  (7, 'Pendulum Circles', 'Shoulder', 1),
+  (8, 'External Rotation Band', 'Shoulder', 3),
+  (9, 'Scaption Raise', 'Shoulder', 3),
+  (10, 'Prone Y Raise', 'Shoulder', 4)
+ON DUPLICATE KEY UPDATE
+  BodyRegion = VALUES(BodyRegion),
+  Difficulty = VALUES(Difficulty);
+`;
+
+const ADMIN_SEED_SESSIONS_SQL = `
+INSERT INTO Sessions (SessionID, PatientID, TherapistID, SessionDate, SessionTime, Status, PainPre, PainPost, Notes)
+VALUES
+  (100, 1, 1, '2025-11-05', '09:00:00', 'Completed', 6, 3, 'seed-admin'),
+  (101, 2, 1, '2025-11-12', '10:00:00', 'No-Show', 0, NULL, 'seed-admin'),
+  (102, 3, 1, '2025-12-02', '09:00:00', 'Completed', 4, 2, 'seed-admin'),
+  (103, 4, 1, '2025-12-09', '11:00:00', 'No-Show', 0, NULL, 'seed-admin'),
+  (104, 1, 3, '2025-11-07', '09:00:00', 'Completed', 5, 3, 'seed-admin'),
+  (105, 5, 3, '2025-11-21', '10:00:00', 'No-Show', 0, NULL, 'seed-admin'),
+  (106, 2, 3, '2025-12-06', '10:00:00', 'Completed', 3, 2, 'seed-admin'),
+  (107, 3, 3, '2025-12-20', '11:00:00', 'No-Show', 0, NULL, 'seed-admin'),
+  (108, 4, 5, '2025-11-08', '09:00:00', 'Completed', 7, 4, 'seed-admin'),
+  (109, 5, 5, '2025-11-15', '09:00:00', 'Completed', 6, 3, 'seed-admin'),
+  (110, 1, 5, '2025-12-05', '10:00:00', 'No-Show', 0, NULL, 'seed-admin'),
+  (111, 3, 5, '2025-12-12', '11:00:00', 'Completed', 4, 2, 'seed-admin'),
+  (112, 2, 5, '2025-12-19', '09:00:00', 'Completed', 5, 3, 'seed-admin'),
+  (113, 4, 5, '2025-12-26', '09:00:00', 'No-Show', 0, NULL, 'seed-admin')
+ON DUPLICATE KEY UPDATE
+  Status = VALUES(Status),
+  PainPre = VALUES(PainPre),
+  PainPost = VALUES(PainPost),
+  Notes = VALUES(Notes);
+`;
+
+const ADMIN_SEED_SESSION_EXERCISES_SQL = `
+INSERT INTO SessionExercises (SessionExerciseID, SessionID, ExerciseID, Sets, Reps, Resistance)
+VALUES
+  (1000, 100, 3, 3, 10, 'Bodyweight'),
+  (1001, 100, 6, 2, 12, 'Light band'),
+  (1002, 101, 8, 3, 15, 'Green band'),
+  (1003, 101, 9, 3, 10, '5 lb'),
+  (1004, 102, 6, 3, 12, 'Light band'),
+  (1005, 102, 10, 2, 8, 'Bodyweight'),
+  (1006, 103, 7, 2, 15, 'None'),
+  (1007, 103, 8, 3, 12, 'Green band'),
+  (1008, 104, 3, 3, 12, 'Bodyweight'),
+  (1009, 104, 9, 3, 10, '5 lb'),
+  (1010, 105, 6, 2, 15, 'Light band'),
+  (1011, 105, 7, 2, 20, 'None'),
+  (1012, 106, 8, 3, 12, 'Blue band'),
+  (1013, 106, 9, 3, 12, '8 lb'),
+  (1014, 107, 10, 2, 8, 'Bodyweight'),
+  (1015, 107, 3, 3, 10, 'Bodyweight'),
+  (1016, 108, 6, 3, 12, 'Light band'),
+  (1017, 108, 8, 3, 15, 'Green band'),
+  (1018, 109, 9, 3, 10, '5 lb'),
+  (1019, 109, 10, 2, 8, 'Bodyweight'),
+  (1020, 110, 7, 2, 15, 'None'),
+  (1021, 110, 6, 2, 12, 'Light band'),
+  (1022, 111, 8, 3, 12, 'Blue band'),
+  (1023, 111, 3, 3, 12, 'Bodyweight'),
+  (1024, 112, 9, 3, 12, '8 lb'),
+  (1025, 112, 10, 2, 10, 'Bodyweight'),
+  (1026, 113, 6, 3, 12, 'Light band'),
+  (1027, 113, 7, 2, 20, 'None')
+ON DUPLICATE KEY UPDATE
+  Sets = VALUES(Sets),
+  Reps = VALUES(Reps),
+  Resistance = VALUES(Resistance);
+`;
+
+const ADMIN_SEED_OUTCOME_MEASURES_SQL = `
+INSERT INTO OutcomeMeasures (OutcomeID, PatientID, MeasureName, Score, TakenOn, Notes)
+VALUES
+  (100, 1, 'SPADI', 68.0, '2025-08-30', 'Baseline shoulder pain'),
+  (101, 1, 'SPADI', 32.0, '2025-11-20', 'Post-plan progress'),
+  (102, 2, 'LEFS', 42.0, '2025-08-25', 'Initial assessment'),
+  (103, 2, 'LEFS', 64.0, '2025-12-05', 'Improved lower-extremity function'),
+  (104, 3, 'DASH', 70.0, '2025-08-18', 'Baseline upper limb disability'),
+  (105, 3, 'DASH', 40.0, '2025-12-10', 'Follow-up improvement'),
+  (106, 4, 'SPADI', 75.0, '2025-09-02', 'Initial report'),
+  (107, 4, 'SPADI', 50.0, '2025-12-18', 'Improved mobility'),
+  (108, 5, 'LEFS', 55.0, '2025-08-22', 'Baseline function'),
+  (109, 5, 'LEFS', 70.0, '2025-11-30', 'Significant improvement')
+ON DUPLICATE KEY UPDATE
+  Score = VALUES(Score),
+  Notes = VALUES(Notes);
+`;
 
 app.post('/auth/login', async (req, res) => {
   const { username, password } = req.body ?? {};
@@ -763,13 +901,189 @@ app.patch('/patients/:patientId/sessions/:sessionId', async (req, res) => {
   }
 });
 
+app.get('/admin/metrics', async (_req, res) => {
+  try {
+    const [noShowRows] = await pool.query<NoShowRateRow[]>(
+      `SELECT Therapist.StaffID AS TherapistID,
+              Staff.StaffName,
+              DATE_FORMAT(Sessions.SessionDate, '%Y-%m') AS MonthLabel,
+              SUM(CASE WHEN Sessions.Status = 'No-Show' THEN 1 ELSE 0 END) AS NoShows,
+              COUNT(*) AS TotalSessions
+       FROM Sessions
+       INNER JOIN Therapist ON Therapist.StaffID = Sessions.TherapistID
+       INNER JOIN Staff ON Staff.StaffID = Therapist.StaffID
+       GROUP BY Therapist.StaffID, Staff.StaffName, MonthLabel
+       ORDER BY MonthLabel ASC, Staff.StaffName ASC`,
+    );
+
+    const [outcomeRows] = await pool.query<OutcomeChangeRow[]>(
+      `WITH ranked AS (
+         SELECT
+           OutcomeMeasures.PatientID,
+           OutcomeMeasures.MeasureName,
+           OutcomeMeasures.Score,
+           OutcomeMeasures.TakenOn,
+           ROW_NUMBER() OVER (PARTITION BY OutcomeMeasures.PatientID, OutcomeMeasures.MeasureName ORDER BY OutcomeMeasures.TakenOn ASC) AS rn_asc,
+           ROW_NUMBER() OVER (PARTITION BY OutcomeMeasures.PatientID, OutcomeMeasures.MeasureName ORDER BY OutcomeMeasures.TakenOn DESC) AS rn_desc
+         FROM OutcomeMeasures
+       )
+       SELECT
+         ranked.PatientID,
+         Patients.Name AS PatientName,
+         ranked.MeasureName,
+         MAX(CASE WHEN ranked.rn_asc = 1 THEN ranked.Score END) AS BaselineScore,
+         MAX(CASE WHEN ranked.rn_desc = 1 THEN ranked.Score END) AS LatestScore,
+         MAX(CASE WHEN ranked.rn_desc = 1 THEN ranked.Score END) - MAX(CASE WHEN ranked.rn_asc = 1 THEN ranked.Score END) AS Delta
+       FROM ranked
+       INNER JOIN Patients ON Patients.PatientID = ranked.PatientID
+       GROUP BY ranked.PatientID, Patients.Name, ranked.MeasureName
+       HAVING BaselineScore IS NOT NULL AND LatestScore IS NOT NULL
+       ORDER BY Patients.Name ASC, ranked.MeasureName ASC`,
+    );
+
+    const [exerciseRows] = await pool.query<ShoulderExerciseMetricRow[]>(
+      `SELECT Exercises.Name AS ExerciseName,
+              COUNT(*) AS Prescriptions
+       FROM SessionExercises
+       INNER JOIN Exercises ON Exercises.ExerciseID = SessionExercises.ExerciseID
+       WHERE Exercises.BodyRegion = 'Shoulder'
+       GROUP BY Exercises.ExerciseID, Exercises.Name
+       ORDER BY Prescriptions DESC, Exercises.Name ASC
+       LIMIT 5`,
+    );
+
+    const [outcomeDetailRows] = await pool.query<OutcomeDetailRow[]>(
+      `SELECT OutcomeMeasures.OutcomeID,
+              OutcomeMeasures.PatientID,
+              Patients.Name AS PatientName,
+              OutcomeMeasures.MeasureName,
+              OutcomeMeasures.Score,
+              OutcomeMeasures.TakenOn,
+              OutcomeMeasures.Notes
+       FROM OutcomeMeasures
+       INNER JOIN Patients ON Patients.PatientID = OutcomeMeasures.PatientID
+       ORDER BY Patients.Name ASC, OutcomeMeasures.MeasureName ASC, OutcomeMeasures.TakenOn ASC`,
+    );
+
+    const [exerciseOrderRows] = await pool.query<ShoulderExerciseOrderRow[]>(
+      `SELECT Exercises.Name AS ExerciseName,
+              SessionExercises.SessionID,
+              Sessions.SessionDate,
+              Patients.Name AS PatientName,
+              Staff.StaffName AS TherapistName
+       FROM SessionExercises
+       INNER JOIN Exercises ON Exercises.ExerciseID = SessionExercises.ExerciseID
+       INNER JOIN Sessions ON Sessions.SessionID = SessionExercises.SessionID
+       INNER JOIN Patients ON Patients.PatientID = Sessions.PatientID
+       INNER JOIN Therapist ON Therapist.StaffID = Sessions.TherapistID
+       INNER JOIN Staff ON Staff.StaffID = Therapist.StaffID
+       WHERE Exercises.BodyRegion = 'Shoulder'
+       ORDER BY Exercises.Name ASC, Sessions.SessionDate DESC`,
+    );
+
+    res.json({
+      noShowRates: noShowRows.map((row) => ({
+        therapistId: row.TherapistID,
+        therapistName: row.StaffName,
+        month: row.MonthLabel,
+        totalSessions: Number(row.TotalSessions ?? 0),
+        noShows: Number(row.NoShows ?? 0),
+        rate:
+          Number(row.TotalSessions ?? 0) > 0
+            ? Number(row.NoShows ?? 0) / Number(row.TotalSessions ?? 0)
+            : 0,
+      })),
+      outcomeChanges: outcomeRows.map((row) => ({
+        patientId: row.PatientID,
+        patientName: row.PatientName,
+        measureName: row.MeasureName,
+        baselineScore: row.BaselineScore === null ? null : Number(row.BaselineScore),
+        latestScore: row.LatestScore === null ? null : Number(row.LatestScore),
+        delta: row.Delta === null ? null : Number(row.Delta),
+      })),
+      topShoulderExercises: exerciseRows.map((row) => ({
+        exerciseName: row.ExerciseName,
+        prescriptions: Number(row.Prescriptions ?? 0),
+      })),
+      outcomeDetails: outcomeDetailRows.map((row) => ({
+        outcomeId: row.OutcomeID,
+        patientId: row.PatientID,
+        patientName: row.PatientName,
+        measureName: row.MeasureName,
+        score: Number(row.Score),
+        takenOn: row.TakenOn,
+        notes: row.Notes,
+      })),
+      shoulderOrders: exerciseOrderRows.map((row) => ({
+        exerciseName: row.ExerciseName,
+        sessionId: row.SessionID,
+        sessionDate: row.SessionDate,
+        patientName: row.PatientName,
+        therapistName: row.TherapistName,
+      })),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ message });
+  }
+});
+
 const port = Number(process.env.PORT ?? '4000');
+
+async function ensureAdminUser(): Promise<void> {
+  if (!DEFAULT_ADMIN_USERNAME || !DEFAULT_ADMIN_PASSWORD) {
+    return;
+  }
+
+  const [existingRows] = await pool.query<UserIdRow[]>(
+    'SELECT UserID FROM Users WHERE Username = :username LIMIT 1',
+    { username: DEFAULT_ADMIN_USERNAME },
+  );
+
+  const { hash, salt } = await createPasswordRecord(DEFAULT_ADMIN_PASSWORD);
+
+  if (existingRows.length === 0) {
+    await pool.execute<ResultSetHeader>(
+      `INSERT INTO Users (Username, PasswordHash, PasswordSalt, Role)
+       VALUES (:username, :hash, :salt, 'admin')`,
+      {
+        username: DEFAULT_ADMIN_USERNAME,
+        hash,
+        salt,
+      },
+    );
+  } else {
+    await pool.execute<ResultSetHeader>(
+      `UPDATE Users
+       SET PasswordHash = :hash,
+           PasswordSalt = :salt,
+           Role = 'admin',
+           PatientID = NULL,
+           TherapistID = NULL
+       WHERE UserID = :userId`,
+      {
+        hash,
+        salt,
+        userId: existingRows[0]!.UserID,
+      },
+    );
+  }
+}
+
+async function seedAdminDemoData(): Promise<void> {
+  await pool.query(ADMIN_SEED_EXERCISES_SQL);
+  await pool.query(ADMIN_SEED_SESSIONS_SQL);
+  await pool.query(ADMIN_SEED_SESSION_EXERCISES_SQL);
+  await pool.query(ADMIN_SEED_OUTCOME_MEASURES_SQL);
+}
 
 async function start() {
   const dbName = await verifyDatabase();
   await ensureUsersTable();
   await ensureReferralsConstraint();
   await ensureSessionsSchema();
+  await ensureAdminUser();
+  await seedAdminDemoData();
   console.info(`Connected to database: ${dbName ?? 'unknown'}`);
 
   app.listen(port, () => {

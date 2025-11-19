@@ -4,6 +4,7 @@ import './App.css';
 import Home from './pages/Home';
 import Onboarding from './pages/Onboarding';
 import PatientHome from './pages/PatientHome';
+import AdminHome from './pages/AdminHome';
 import { AuthProvider, useAuth, type AuthUser } from './context/AuthContext';
 
 type RequireRoleProps = {
@@ -24,6 +25,9 @@ const RequireRole = ({ allowed, children }: RequireRoleProps) => {
     }
     if (user.role === 'patient') {
       return <Navigate to="/patient" replace />;
+    }
+    if (user.role === 'admin') {
+      return <Navigate to="/admin" replace />;
     }
     return <Navigate to="/" replace />;
   }
@@ -47,6 +51,14 @@ const AppRoutes = () => (
       element={
         <RequireRole allowed={['patient']}>
           <PatientHome />
+        </RequireRole>
+      }
+    />
+    <Route
+      path="/admin"
+      element={
+        <RequireRole allowed={['admin']}>
+          <AdminHome />
         </RequireRole>
       }
     />

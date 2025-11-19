@@ -7,6 +7,11 @@ import { useAuth } from '../../context/AuthContext';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
 const SESSION_STATUSES = ['Scheduled', 'Completed', 'Canceled', 'No-Show'];
 
+const normalizeDateValue = (value: string | null | undefined): string => {
+  if (!value) return '';
+  return value.includes('T') ? value.split('T')[0] ?? '' : value;
+};
+
 type SessionEditorProps = {
   session: UpcomingSession | null;
   therapists: TherapistOption[];
@@ -35,7 +40,7 @@ const SessionEditor = ({ session, therapists, onClose, onUpdated }: SessionEdito
     if (session) {
       setFormValues({
         therapistId: String(session.therapistId),
-        sessionDate: session.sessionDate,
+        sessionDate: normalizeDateValue(session.sessionDate),
         sessionTime: session.sessionTime,
         painPre: session.painPre ?? 0,
         notes: session.notes ?? '',
@@ -94,7 +99,7 @@ const SessionEditor = ({ session, therapists, onClose, onUpdated }: SessionEdito
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           therapistId: Number(formValues.therapistId),
-          sessionDate: formValues.sessionDate,
+          sessionDate: normalizeDateValue(formValues.sessionDate),
           sessionTime: formValues.sessionTime,
           painPre: formValues.painPre,
           notes: formValues.notes,

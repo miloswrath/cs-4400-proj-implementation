@@ -109,6 +109,8 @@ const Login = () => {
         navigate('/onboarding', { replace: true });
       } else if (data.role === 'patient') {
         navigate('/patient', { replace: true });
+      } else if (data.role === 'admin') {
+        navigate('/admin', { replace: true });
       } else {
         setLoginFeedback({ variant: 'success', message: `Welcome back, ${data.username}!` });
       }

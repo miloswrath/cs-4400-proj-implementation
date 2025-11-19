@@ -1,5 +1,7 @@
 # PT Clinic Portal
 
+> testing admin password
+> `AA**AA`
 Prototype patient portal for a physical-therapy clinic. It pairs a Vite/React frontend with a TypeScript/Express API and a MySQL database that is preloaded with fictional people, sessions, and referrals. **No real medical records live in this repo or in the default database dump.**
 
 ## What's inside
