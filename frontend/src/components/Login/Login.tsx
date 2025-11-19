@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Login.css';
+import { useAuth } from '../../context/AuthContext';
 
 type LoginFields = {
   username: string;
@@ -24,6 +26,8 @@ type Feedback = {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [loginFields, setLoginFields] = useState<LoginFields>({
     username: '',
     password: '',
@@ -38,7 +42,8 @@ const Login = () => {
     confirmPassword: '',
   });
 
-  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [loginFeedback, setLoginFeedback] = useState<Feedback>(null);
+  const [signupFeedback, setSignupFeedback] = useState<Feedback>(null);
   const [loginLoading, setLoginLoading] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
 
@@ -70,12 +75,12 @@ const Login = () => {
   const handleLoginSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!loginFields.username || !loginFields.password) {
-      setFeedback({ variant: 'error', message: 'Please enter both your username and password to sign in.' });
+      setLoginFeedback({ variant: 'error', message: 'Please enter both your username and password to sign in.' });
       return;
     }
 
     setLoginLoading(true);
-    setFeedback(null);
+    setLoginFeedback(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -91,10 +96,25 @@ const Login = () => {
       }
 
       const data = await response.json();
-      setFeedback({ variant: 'success', message: `Welcome back, ${data.username}!` });
+      setUser({
+        userId: data.userId,
+        username: data.username,
+        role: data.role,
+        patientId: data.patientId ?? null,
+        patientName: data.patientName ?? null,
+        needsProfileCompletion: data.needsProfileCompletion ?? false,
+      });
+
+      if (data.role === 'pending') {
+        navigate('/onboarding', { replace: true });
+      } else if (data.role === 'patient') {
+        navigate('/patient', { replace: true });
+      } else {
+        setLoginFeedback({ variant: 'success', message: `Welcome back, ${data.username}!` });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to sign in right now.';
-      setFeedback({ variant: 'error', message });
+      setLoginFeedback({ variant: 'error', message });
     } finally {
       setLoginLoading(false);
     }
@@ -103,12 +123,12 @@ const Login = () => {
   const handleSignupSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (signupFields.password !== signupFields.confirmPassword) {
-      setFeedback({ variant: 'error', message: 'Passwords do not match. Please try again.' });
+      setSignupFeedback({ variant: 'error', message: 'Passwords do not match. Please try again.' });
       return;
     }
 
     setSignupLoading(true);
-    setFeedback(null);
+    setSignupFeedback(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/auth/signup`, {
@@ -130,7 +150,7 @@ const Login = () => {
       }
 
       const data = await response.json();
-      setFeedback({ variant: 'success', message: `Account created for ${data.username}. You can sign in now.` });
+      setSignupFeedback({ variant: 'success', message: `Account created for ${data.username}. You can sign in now.` });
       setSignupFields({
         username: '',
         name: '',
@@ -141,18 +161,19 @@ const Login = () => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create your account right now.';
-      setFeedback({ variant: 'error', message });
+      setSignupFeedback({ variant: 'error', message });
     } finally {
       setSignupLoading(false);
     }
   };
 
   return (
-    <div className="login-page">
-      <section className="card">
+    <div className="auth-panels">
+      <section className="auth-card">
         <div className="form-header">
-          <h2>Sign In</h2>
-          <p>Use your existing account to access the dashboard.</p>
+          <p className="eyebrow">Returning patients</p>
+          <h3>Sign in to continue</h3>
+          <p>Access your plan, review session notes, and manage appointments in seconds.</p>
         </div>
         <form className="form" onSubmit={handleLoginSubmit}>
           <label htmlFor="login-username">Username</label>
@@ -162,7 +183,7 @@ const Login = () => {
             type="text"
             value={loginFields.username}
             onChange={handleLoginChange}
-            placeholder="Enter your username"
+            placeholder="you@example.com"
             required
           />
 
@@ -177,90 +198,125 @@ const Login = () => {
             required
           />
 
-          <button type="submit" disabled={loginLoading} aria-busy={loginLoading}>
-            {loginLoading ? 'Signing In…' : 'Login'}
+          {loginFeedback && loginFeedback.variant === 'error' && (
+            <div className="feedback error" role="alert">
+              {loginFeedback.message}
+            </div>
+          )}
+          {loginFeedback && loginFeedback.variant === 'success' && (
+            <div className="feedback success" role="status">
+              {loginFeedback.message}
+            </div>
+          )}
+
+          <button type="submit" className="primary" disabled={loginLoading} aria-busy={loginLoading}>
+            {loginLoading ? 'Signing In…' : 'Access my portal'}
           </button>
         </form>
       </section>
 
-      <section className="card">
+      <section className="auth-card accent">
         <div className="form-header">
-          <h2>Sign Up</h2>
-          <p>Patients can create portal access for scheduling and updates.</p>
+          <p className="eyebrow">New to the clinic?</p>
+          <h3>Create your account</h3>
+          <p>Connect with your therapist and keep your care team updated from any device.</p>
         </div>
         <form className="form" onSubmit={handleSignupSubmit}>
-          <label htmlFor="signup-username">Username</label>
-          <input
-            id="signup-username"
-            name="username"
-            type="text"
-            value={signupFields.username}
-            onChange={handleSignupChange}
-            placeholder="Choose a username"
-            required
-          />
+          <div className="form-grid">
+            <label htmlFor="signup-username">
+              Username
+              <input
+                id="signup-username"
+                name="username"
+                type="text"
+                value={signupFields.username}
+                onChange={handleSignupChange}
+                placeholder="Choose a unique username"
+                required
+              />
+            </label>
 
-          <label htmlFor="signup-name">Name</label>
-          <input
-            id="signup-name"
-            name="name"
-            type="text"
-            value={signupFields.name}
-            onChange={handleSignupChange}
-            placeholder="Your full name"
-            required
-          />
+            <label htmlFor="signup-name">
+              Full name
+              <input
+                id="signup-name"
+                name="name"
+                type="text"
+                value={signupFields.name}
+                onChange={handleSignupChange}
+                placeholder="Your legal name"
+                required
+              />
+            </label>
 
-          <label htmlFor="signup-dob">Date of Birth</label>
-          <input
-            id="signup-dob"
-            name="dob"
-            type="date"
-            value={signupFields.dob}
-            onChange={handleSignupChange}
-            required
-          />
+            <label htmlFor="signup-dob">
+              Date of birth
+              <input
+                id="signup-dob"
+                name="dob"
+                type="date"
+                value={signupFields.dob}
+                onChange={handleSignupChange}
+                required
+              />
+            </label>
 
-          <label htmlFor="signup-phone">Phone Number</label>
-          <input
-            id="signup-phone"
-            name="phone"
-            type="tel"
-            value={signupFields.phone}
-            onChange={handleSignupChange}
-            placeholder="e.g. 555-123-4567"
-            required
-          />
+            <label htmlFor="signup-phone">
+              Phone number
+              <input
+                id="signup-phone"
+                name="phone"
+                type="tel"
+                value={signupFields.phone}
+                onChange={handleSignupChange}
+                placeholder="e.g. 555-123-4567"
+                required
+              />
+            </label>
 
-          <label htmlFor="signup-password">Password</label>
-          <input
-            id="signup-password"
-            name="password"
-            type="password"
-            value={signupFields.password}
-            onChange={handleSignupChange}
-            placeholder="Create a password"
-            required
-          />
+            <label htmlFor="signup-password">
+              Password
+              <input
+                id="signup-password"
+                name="password"
+                type="password"
+                value={signupFields.password}
+                onChange={handleSignupChange}
+                placeholder="At least 8 characters"
+                required
+              />
+            </label>
 
-          <label htmlFor="signup-confirmPassword">Confirm Password</label>
-          <input
-            id="signup-confirmPassword"
-            name="confirmPassword"
-            type="password"
-            value={signupFields.confirmPassword}
-            onChange={handleSignupChange}
-            placeholder="Re-enter password"
-            required
-          />
+            <label htmlFor="signup-confirmPassword">
+              Confirm password
+              <input
+                id="signup-confirmPassword"
+                name="confirmPassword"
+                type="password"
+                value={signupFields.confirmPassword}
+                onChange={handleSignupChange}
+                placeholder="Re-enter password"
+                required
+              />
+            </label>
+          </div>
+
+          {signupFeedback && signupFeedback.variant === 'success' && (
+            <div className="feedback success" role="status">
+              {signupFeedback.message}
+            </div>
+          )}
+          {signupFeedback && signupFeedback.variant === 'error' && (
+            <div className="feedback error" role="alert">
+              {signupFeedback.message}
+            </div>
+          )}
 
           <button type="submit" disabled={signupLoading} aria-busy={signupLoading}>
-            {signupLoading ? 'Creating Account…' : 'Create Account'}
+            {signupLoading ? 'Creating Account…' : 'Create my account'}
           </button>
         </form>
       </section>
-
-      {feedback && <p className={`feedback ${feedback.variant}`}>{feedback.message}</p>}
     </div>
   );
 };

@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile.db
     image: app-mysql-initialized
-    container_name: app-mysql
+    container_name: PT_Clinic
     environment:
       MYSQL_ROOT_PASSWORD: rootpw
       MYSQL_DATABASE: PT_Clinic

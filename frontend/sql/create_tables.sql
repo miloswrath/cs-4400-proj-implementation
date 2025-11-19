@@ -54,6 +54,7 @@ CREATE TABLE Sessions (
     PatientID INT NOT NULL,
     TherapistID INT NOT NULL,               -- FK to Therapist (StaffID)
     SessionDate DATE NOT NULL,
+    SessionTime TIME NOT NULL,
     Status ENUM('Scheduled','Completed','Canceled','No-Show') NOT NULL DEFAULT 'Scheduled',
     PainPre TINYINT NULL,
     PainPost TINYINT NULL,
@@ -68,8 +69,10 @@ CREATE TABLE Sessions (
         FOREIGN KEY (TherapistID) REFERENCES Therapist(StaffID)
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
+    CONSTRAINT chk_session_time CHECK (SessionTime BETWEEN '08:00:00' AND '16:00:00'),
     -- Optional business rule: at most one session per patient per date
-    CONSTRAINT uq_patient_sessiondate UNIQUE (PatientID, SessionDate)
+    CONSTRAINT uq_patient_sessiondate UNIQUE (PatientID, SessionDate),
+    CONSTRAINT uq_therapist_slot UNIQUE (TherapistID, SessionDate, SessionTime)
 );
 
 CREATE TABLE Referrals (
@@ -82,9 +85,6 @@ CREATE TABLE Referrals (
         FOREIGN KEY (PatientID) REFERENCES Patients(PatientID)
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
-    CONSTRAINT chk_ref_one_source CHECK (
-        ReferringProvider IS NULL
-    ),
     -- Optional de-dup rule
     INDEX idx_ref_patient_date_dx (PatientID, ReferralDate, DxCode)
 );
@@ -162,12 +162,12 @@ INSERT INTO Exercises (Name, BodyRegion, Difficulty) VALUES
 ('Plank',        'Core',    5);
 
 -- Sessions (TherapistID must reference Therapist.StaffID: 1,3,5)
-INSERT INTO Sessions (PatientID, TherapistID, SessionDate, Status, PainPre, PainPost, Notes) VALUES
-(1, 1, '2025-10-10', 'Completed', 7, 4, 'Initial evaluation and assessment'),
-(2, 3, '2025-10-11', 'Completed', 6, 3, 'Manual therapy and stretching'),
-(3, 5, '2025-10-12', 'Scheduled', 5, 5, 'Follow-up session planned'),
-(4, 3, '2025-10-13', 'Canceled',  0, 0, 'Patient canceled due to illness'),
-(5, 1, '2025-10-14', 'Completed', 8, 5, 'Pain management and mobility work');
+INSERT INTO Sessions (PatientID, TherapistID, SessionDate, SessionTime, Status, PainPre, PainPost, Notes) VALUES
+(1, 1, '2025-10-10', '08:00:00', 'Completed', 7, 4, 'Initial evaluation and assessment'),
+(2, 3, '2025-10-11', '09:00:00', 'Completed', 6, 3, 'Manual therapy and stretching'),
+(3, 5, '2025-10-12', '10:00:00', 'Scheduled', 5, 5, 'Follow-up session planned'),
+(4, 3, '2025-10-13', '11:00:00', 'Canceled',  0, 0, 'Patient canceled due to illness'),
+(5, 1, '2025-10-14', '13:00:00', 'Completed', 8, 5, 'Pain management and mobility work');
 
 -- Referrals
 -- Use internal referrer when it’s one of the therapists; otherwise use external name.
@@ -202,22 +202,17 @@ CREATE TABLE Users (
     Username VARCHAR(60) NOT NULL UNIQUE,
     PasswordHash VARBINARY(255) NOT NULL,
     PasswordSalt VARBINARY(255) NOT NULL,
-    Role ENUM('patient','staff','therapist','admin') NOT NULL DEFAULT 'patient',
+    Role ENUM('pending','patient','therapist','admin') NOT NULL DEFAULT 'pending',
     PatientID INT NULL UNIQUE,
-    StaffID INT NULL UNIQUE,
+    TherapistID INT NULL UNIQUE,
     CreatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UpdatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_users_patient
         FOREIGN KEY (PatientID) REFERENCES Patients(PatientID)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
-    CONSTRAINT fk_users_staff
-        FOREIGN KEY (StaffID) REFERENCES Staff(StaffID)
+    CONSTRAINT fk_users_therapist
+        FOREIGN KEY (TherapistID) REFERENCES Therapist(StaffID)
         ON UPDATE CASCADE
-        ON DELETE CASCADE,
-    CONSTRAINT chk_users_owner CHECK (
-        (PatientID IS NOT NULL AND StaffID IS NULL)
-        OR (PatientID IS NULL AND StaffID IS NOT NULL)
-        OR (PatientID IS NULL AND StaffID IS NULL)
-    )
+        ON DELETE CASCADE
 );

@@ -1,0 +1,77 @@
+.upcoming-card {
+  background: #fff;
+  border-radius: 1.5rem;
+  padding: clamp(1.5rem, 3vw, 2rem);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.upcoming-card .empty-state {
+  color: var(--text-muted);
+}
+
+.session-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.session-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--surface-muted);
+}
+
+.session-date {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.session-date span {
+  margin-left: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.session-therapist {
+  margin: 0.25rem 0;
+  font-weight: 500;
+}
+
+.session-status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.session-notes {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.session-list button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1.25rem;
+  background: rgba(15, 23, 42, 0.85);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.session-list button:hover {
+  opacity: 0.9;
+}

@@ -1,73 +1,40 @@
-# React + TypeScript + Vite
+# Frontend — PT Clinic Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Patient-facing single-page app built with modern React. It handles sign-up, onboarding, scheduling, and session editing on top of the Express API that lives in `../backend`. Every screen is wired to the demo MySQL database that ships with this repo, but all records are fictional and live only on your machine unless you share them.
 
-Currently, two official plugins are available:
+## Tools and how we use them
+- **React 19 + TypeScript** — component authoring and type safety. Hooks + strict typing help us catch invalid UI states before they hit the API.
+- **React Router v7** — client-side pages (`/`, `/onboarding`, `/patient`). Routing and `<Navigate>` gates enforce role-based flows (pending patients go through onboarding, etc.).
+- **Context API (`AuthContext`)** — keeps the logged-in user object in memory so every component knows whether to show sign-in, onboarding, or the dashboard.
+- **Vite 7** — dev server and build pipeline. Vite proxies API calls during `npm run dev` and outputs an optimized bundle for production-like runs.
+- **Modern CSS modules** — each page/component owns a `.css` file that scopes styling without bringing in a heavyweight design system. Utility classes like `eyebrow` keep typography consistent.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Feature map
+1. **Home / Auth** — `components/Login` renders side-by-side log-in and sign-up forms. It calls `/auth/login` and `/auth/signup`, showing contextual success/error feedback.
+2. **Onboarding** — `pages/Onboarding` collects a diagnosis code, referral date, and provider name, then sends them to `/patients/:id/onboarding` to unlock the full portal.
+3. **Patient dashboard** — `pages/PatientHome` fetches therapists and upcoming sessions. It renders:
+   - `ScheduleSession` to request a visit, validate time slots, and submit `/patients/:id/sessions`.
+   - `UpcomingSessions` to show scheduled visits and open the inline editor.
+   - `SessionEditor` overlay for rescheduling, updating status, pain scale, and notes via `PATCH /patients/:id/sessions/:sessionId`.
 
-## React Compiler
+Because the backing data is seeded with fake names and appointments, you can safely explore flows without touching real PHI. Feel free to create as many dummy accounts as you need for demos.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Running the UI
+```bash
+npm install
+npm run dev
 ```
+Create a `frontend/.env` file with `VITE_API_BASE_URL=http://localhost:4000` (or the URL where the backend runs). Vite will print the local URL to open in your browser.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Building for production
+```bash
+npm run build
 ```
+The command type-checks the project and outputs static assets into `dist/`. Serve that folder with any static file host that can proxy API requests to the backend.
+
+## Troubleshooting
+- **CORS errors?** Ensure the backend `.env` `CORS_ORIGIN` includes the frontend origin.
+- **API 404s?** Check that the backend server is running and that `VITE_API_BASE_URL` matches its port.
+- **Stale auth state?** The app only keeps auth info in memory; refreshes clear session data, so just sign back in.
+
+Again, this is a prototype. Everything you see uses fake data, so be transparent when demoing it to stakeholders.

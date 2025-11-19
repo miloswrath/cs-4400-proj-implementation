@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS SessionExercises;
 DROP TABLE IF EXISTS OutcomeMeasures;
 DROP TABLE IF EXISTS Sessions;
 DROP TABLE IF EXISTS Referrals;
+DROP TABLE IF EXISTS Users;
 DROP TABLE IF EXISTS Therapist;
 DROP TABLE IF EXISTS Exercises;
 DROP TABLE IF EXISTS Staff;
@@ -84,9 +85,6 @@ CREATE TABLE Referrals (
         FOREIGN KEY (PatientID) REFERENCES Patients(PatientID)
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
-    CONSTRAINT chk_ref_one_source CHECK (
-        ReferringProvider IS NULL
-    ),
     -- Optional de-dup rule
     INDEX idx_ref_patient_date_dx (PatientID, ReferralDate, DxCode)
 );
@@ -126,6 +124,34 @@ CREATE TABLE OutcomeMeasures (
     -- Prevent duplicate scoring of same instrument on same day
     CONSTRAINT uq_om_unique UNIQUE (PatientID, MeasureName, TakenOn),
     INDEX idx_patient_measure (PatientID, MeasureName)
+);
+
+-- =========================
+-- Authentication
+-- =========================
+CREATE TABLE Users (
+    UserID INT PRIMARY KEY AUTO_INCREMENT,
+    Username VARCHAR(60) NOT NULL UNIQUE,
+    PasswordHash VARBINARY(255) NOT NULL,
+    PasswordSalt VARBINARY(255) NOT NULL,
+    Role ENUM('patient','staff','therapist','admin') NOT NULL DEFAULT 'patient',
+    PatientID INT NULL UNIQUE,
+    StaffID INT NULL UNIQUE,
+    CreatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_users_patient
+        FOREIGN KEY (PatientID) REFERENCES Patients(PatientID)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT fk_users_staff
+        FOREIGN KEY (StaffID) REFERENCES Staff(StaffID)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT chk_users_owner CHECK (
+        (PatientID IS NOT NULL AND StaffID IS NULL)
+        OR (PatientID IS NULL AND StaffID IS NOT NULL)
+        OR (PatientID IS NULL AND StaffID IS NULL)
+    )
 );
 
 -- =========================
