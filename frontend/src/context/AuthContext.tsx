@@ -7,6 +7,9 @@ export type AuthUser = {
   patientId: number | null;
   patientName?: string | null;
   needsProfileCompletion?: boolean;
+  staffId?: number | null;
+  therapistName?: string | null;
+  needsPasswordReset?: boolean;
 };
 
 type AuthContextValue = {

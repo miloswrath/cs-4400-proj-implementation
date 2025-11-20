@@ -5,4 +5,6 @@ export declare function ensureUsersTable(): Promise<void>;
 export declare function ensureReferralsConstraint(): Promise<void>;
 export declare function ensureSessionsSchema(): Promise<void>;
 export default pool;
+export declare function ensureDerivedStructures(): Promise<void>;
+export declare function waitForDatabase(retries?: number, delayMs?: number): Promise<void>;
 //# sourceMappingURL=db.d.ts.map

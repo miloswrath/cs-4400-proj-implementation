@@ -17,6 +17,10 @@ const Home = () => {
     return <Navigate to="/patient" replace />;
   }
 
+  if (user?.role === 'therapist') {
+    return <Navigate to="/therapist" replace />;
+  }
+
   if (user?.role === 'admin') {
     return <Navigate to="/admin" replace />;
   }

@@ -21,8 +21,10 @@
 }
 
 .home-logo img {
-  width: 52px;
-  height: 52px;
+  width: clamp(240px, 5vw, 240px);
+  aspect-ratio: 1 / 1;
+  height: auto;
+  display: block;
 }
 
 .home-logo p {

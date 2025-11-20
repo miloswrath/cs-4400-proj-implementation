@@ -34,7 +34,7 @@ DB_NAME=PT_Clinic
 CORS_ORIGIN=http://localhost:5173
 ```
 
-`CORS_ORIGIN` accepts a comma-separated list when you need to allow multiple frontends. The default admin login can be overridden with `ADMIN_USERNAME` / `ADMIN_PASSWORD` env vars (defaults: `admin` / `AA**AA`).
+`CORS_ORIGIN` accepts a comma-separated list when you need to allow multiple frontends. The default admin login (`admin` / `AA**AA`) ships with the seed SQL—update the script or run your own SQL if you want different credentials. If your database boots slowly (e.g., after `docker compose up`), tweak `DB_BOOT_RETRIES` and `DB_BOOT_RETRY_DELAY_MS` to control how long the server waits for the connection before giving up.
 
 ## Available scripts
 - `npm run dev` — Watches `src/` and runs `ts-node` via `nodemon`.
@@ -47,7 +47,7 @@ CORS_ORIGIN=http://localhost:5173
 The repo includes:
 - `sql/00_app_user.sql` — ensures the `appuser/appsecret` MySQL account exists.
 - `sql/create_tables.sql` — creates all tables and inserts the fictional patients, staff, therapists, referrals, outcome measures, and sessions used by the app.
-- `backend/sql/admin_seed.sql` — adds deeper shoulder exercise data, multi-month sessions, and outcome histories so the admin dashboard always has something to chart.
+- `sql/02_seed_data.sql` — adds deeper shoulder exercise data, multi-month sessions, outcome histories, and the default admin user so the dashboard always has something to chart.
 - `Dockerfile.db` + `docker-compose.yml` — build a MySQL container that automatically runs the SQL scripts above the first time it starts.
 
-If you need to reset everything, stop the containers, run `docker compose down -v`, and start them again with `docker compose up -d`. The backend also seeds/updates the admin account and analytics dataset every time it boots, so developers using an existing database still get the same demo experience.
+If you need to reset everything, stop the containers, run `docker compose down -v`, and start them again with `docker compose up -d`. To refresh only the sample analytics data (without nuking volumes) run `mysql -uappuser -pappsecret PT_Clinic < sql/02_seed_data.sql`.

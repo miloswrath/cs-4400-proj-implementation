@@ -14,9 +14,41 @@
 
 .patient-dashboard {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
   align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.schedule-column,
+.upcoming-column,
+.past-column {
+  width: 100%;
+}
+
+.past-column {
+  display: flex;
+}
+
+.past-column > * {
+  flex: 1;
+}
+
+@media (min-width: 900px) {
+  .patient-dashboard {
+    grid-template-columns: minmax(320px, 1.05fr) minmax(320px, 1fr);
+  }
+
+  .schedule-column {
+    grid-row: span 2;
+  }
+
+  .upcoming-column {
+    grid-column: 2;
+  }
+
+  .past-column {
+    grid-column: 2;
+  }
 }
 
 .patient-header {

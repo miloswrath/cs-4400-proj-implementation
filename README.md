@@ -71,7 +71,7 @@ Vite prints a local URL (usually `http://localhost:5173`). Open it in your brows
 - Complete onboarding (diagnosis code, referral details). Once finished you will land on the patient dashboard where you can schedule new sessions, review/upate upcoming visits, and experiment with time-slot validation.
 - Review operational analytics by signing in as the pre-seeded admin: **username `admin` / password `AA**AA`**. The Admin tab unlocks no-show rates, outcome deltas, and shoulder exercise orders with click-through detail modals.
 
-If something goes wrong, stop the running commands with `Ctrl+C`, fix any typos, and re-run the steps. You can wipe and rebuild the database at any time with `docker compose down -v` followed by `docker compose up -d`. Restarting the backend is enough to reseed the fictional admin analytics data if you ever want to reset the dashboard.
+If something goes wrong, stop the running commands with `Ctrl+C`, fix any typos, and re-run the steps. You can wipe and rebuild the database at any time with `docker compose down -v` followed by `docker compose up -d`. To refresh the fictional analytics data without rebuilding everything, run `mysql -uappuser -pappsecret PT_Clinic < sql/02_seed_data.sql`.
 
 ## Need more detail?
 - `frontend/README.md` describes the UI stack, routing, and how the views talk to the API.

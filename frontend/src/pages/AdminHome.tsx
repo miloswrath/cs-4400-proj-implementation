@@ -54,6 +54,49 @@ type AdminMetrics = {
   shoulderOrders: ShoulderOrder[];
 };
 
+const NO_SHOW_RATE_QUERY = `SELECT Therapist.StaffID AS TherapistID,
+       Staff.StaffName,
+       DATE_FORMAT(Sessions.SessionDate, '%Y-%m') AS MonthLabel,
+       SUM(CASE WHEN Sessions.Status = 'No-Show' THEN 1 ELSE 0 END) AS NoShows,
+       COUNT(*) AS TotalSessions
+FROM Sessions
+INNER JOIN Therapist ON Therapist.StaffID = Sessions.TherapistID
+INNER JOIN Staff ON Staff.StaffID = Therapist.StaffID
+GROUP BY Therapist.StaffID, Staff.StaffName, MonthLabel
+ORDER BY MonthLabel ASC, Staff.StaffName ASC;`;
+
+const OUTCOME_CHANGE_QUERY = `WITH ranked AS (
+  SELECT
+    OutcomeMeasures.PatientID,
+    OutcomeMeasures.MeasureName,
+    OutcomeMeasures.Score,
+    OutcomeMeasures.TakenOn,
+    ROW_NUMBER() OVER (PARTITION BY OutcomeMeasures.PatientID, OutcomeMeasures.MeasureName ORDER BY OutcomeMeasures.TakenOn ASC) AS rn_asc,
+    ROW_NUMBER() OVER (PARTITION BY OutcomeMeasures.PatientID, OutcomeMeasures.MeasureName ORDER BY OutcomeMeasures.TakenOn DESC) AS rn_desc
+  FROM OutcomeMeasures
+)
+SELECT
+  ranked.PatientID,
+  Patients.Name AS PatientName,
+  ranked.MeasureName,
+  MAX(CASE WHEN ranked.rn_asc = 1 THEN ranked.Score END) AS BaselineScore,
+  MAX(CASE WHEN ranked.rn_desc = 1 THEN ranked.Score END) AS LatestScore,
+  MAX(CASE WHEN ranked.rn_desc = 1 THEN ranked.Score END) - MAX(CASE WHEN ranked.rn_asc = 1 THEN ranked.Score END) AS Delta
+FROM ranked
+INNER JOIN Patients ON Patients.PatientID = ranked.PatientID
+GROUP BY ranked.PatientID, Patients.Name, ranked.MeasureName
+HAVING BaselineScore IS NOT NULL AND LatestScore IS NOT NULL
+ORDER BY Patients.Name ASC, ranked.MeasureName ASC;`;
+
+const TOP_PRESCRIPTIONS_QUERY = `SELECT Exercises.Name AS ExerciseName,
+       COUNT(*) AS Prescriptions
+FROM SessionExercises
+INNER JOIN Exercises ON Exercises.ExerciseID = SessionExercises.ExerciseID
+WHERE Exercises.BodyRegion = 'Shoulder'
+GROUP BY Exercises.ExerciseID, Exercises.Name
+ORDER BY Prescriptions DESC, Exercises.Name ASC
+LIMIT 5;`;
+
 const AdminHome = () => {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
@@ -62,6 +105,18 @@ const AdminHome = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedOutcome, setSelectedOutcome] = useState<OutcomeChange | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [queryModal, setQueryModal] = useState<{ title: string; query: string } | null>(null);
+  const [showTherapistModal, setShowTherapistModal] = useState(false);
+  const [therapistForm, setTherapistForm] = useState({
+    name: '',
+    phone: '',
+    dob: '',
+    specialty: '',
+    username: '',
+  });
+  const [therapistStatus, setTherapistStatus] = useState<{ variant: 'error' | 'success'; message: string } | null>(null);
+  const [therapistLoading, setTherapistLoading] = useState(false);
+  const [createdTherapist, setCreatedTherapist] = useState<{ username: string; tempPassword: string } | null>(null);
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -132,6 +187,73 @@ const AdminHome = () => {
   const formatDelta = (value: number) => (value > 0 ? `+${value.toFixed(1)}` : value.toFixed(1));
   const formatDate = (value: string) => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
+  const showQueryModal = (title: string, query: string) => {
+    setQueryModal({ title, query });
+  };
+
+  const toggleTherapistModal = (open: boolean) => {
+    setShowTherapistModal(open);
+    if (!open) {
+      setTherapistForm({
+        name: '',
+        phone: '',
+        dob: '',
+        specialty: '',
+        username: '',
+      });
+      setTherapistStatus(null);
+      setCreatedTherapist(null);
+      setTherapistLoading(false);
+    }
+  };
+
+  const handleTherapistChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setTherapistForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleTherapistSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setTherapistLoading(true);
+    setTherapistStatus(null);
+    setCreatedTherapist(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/therapists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: therapistForm.name,
+          phone: therapistForm.phone,
+          dob: therapistForm.dob,
+          specialty: therapistForm.specialty,
+          username: therapistForm.username,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message ?? 'Unable to create therapist right now.');
+      }
+
+      const data = await response.json();
+      setTherapistStatus({
+        variant: 'success',
+        message: 'Therapist account created. Share the temporary password securely.',
+      });
+      setCreatedTherapist({
+        username: data.username,
+        tempPassword: data.tempPassword,
+      });
+    } catch (submissionError) {
+      const message =
+        submissionError instanceof Error ? submissionError.message : 'Unable to create therapist right now.';
+      setTherapistStatus({ variant: 'error', message });
+    } finally {
+      setTherapistLoading(false);
+    }
+  };
+
   const selectedOutcomeHistory = useMemo(() => {
     if (!selectedOutcome || !metrics?.outcomeDetails) return [];
     return metrics.outcomeDetails
@@ -158,9 +280,14 @@ const AdminHome = () => {
             <h1>Hi, Admin</h1>
             <p>Monitor at-a-glance trends or sign up new therapists.</p>
           </div>
-          <button type="button" className="admin-signout" onClick={handleSignOut}>
-            Sign out
-          </button>
+          <div className="admin-header-actions">
+            <button type="button" className="admin-action" onClick={() => toggleTherapistModal(true)}>
+              Add therapist
+            </button>
+            <button type="button" className="admin-signout" onClick={handleSignOut}>
+              Sign out
+            </button>
+          </div>
         </header>
 
         {error && (
@@ -174,7 +301,15 @@ const AdminHome = () => {
           <div className="admin-grid">
             <section className="admin-panel wide">
               <header>
-                <h2>No-show rate by therapist</h2>
+                <h2>
+                  <button
+                    type="button"
+                    className="panel-title-button"
+                    onClick={() => showQueryModal('No-show rate by therapist', NO_SHOW_RATE_QUERY)}
+                  >
+                    No-show rate by therapist
+                  </button>
+                </h2>
                 <p>Grouped by therapy month so you can spot outliers quickly.</p>
               </header>
               {groupedNoShow.length === 0 ? (
@@ -208,7 +343,15 @@ const AdminHome = () => {
 
             <section className="admin-panel">
               <header>
-                <h2>Outcome change from baseline</h2>
+                <h2>
+                  <button
+                    type="button"
+                    className="panel-title-button"
+                    onClick={() => showQueryModal('Outcome change from baseline', OUTCOME_CHANGE_QUERY)}
+                  >
+                    Outcome change from baseline
+                  </button>
+                </h2>
                 <p>Compare the first recorded score to the latest for each instrument.</p>
               </header>
               {metrics?.outcomeChanges?.length ? (
@@ -248,7 +391,15 @@ const AdminHome = () => {
 
             <section className="admin-panel">
               <header>
-                <h2>Top prescriptions</h2>
+                <h2>
+                  <button
+                    type="button"
+                    className="panel-title-button"
+                    onClick={() => showQueryModal('Top prescriptions', TOP_PRESCRIPTIONS_QUERY)}
+                  >
+                    Top prescriptions
+                  </button>
+                </h2>
                 <p>Most frequently assigned exercises across all visits.</p>
               </header>
               {metrics?.topShoulderExercises?.length ? (
@@ -370,6 +521,123 @@ const AdminHome = () => {
                 </li>
               ))}
             </ul>
+          </div>
+        </div>
+      )}
+
+      {queryModal && (
+        <div
+          className="admin-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setQueryModal(null)}
+        >
+          <div className="admin-modal query-modal" onClick={(event) => event.stopPropagation()}>
+            <header className="admin-modal-header">
+              <div>
+                <p className="eyebrow">SQL source</p>
+                <h3>{queryModal.title}</h3>
+              </div>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => setQueryModal(null)}
+                aria-label="Close SQL query"
+              >
+                Close
+              </button>
+            </header>
+            <pre className="query-snippet">
+              <code>{queryModal.query}</code>
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {showTherapistModal && (
+        <div
+          className="admin-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => toggleTherapistModal(false)}
+        >
+          <div className="admin-modal" onClick={(event) => event.stopPropagation()}>
+            <header className="admin-modal-header">
+              <div>
+                <p className="eyebrow">New therapist</p>
+                <h3>Create therapist profile</h3>
+              </div>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => toggleTherapistModal(false)}
+                aria-label="Close add therapist dialog"
+              >
+                Close
+              </button>
+            </header>
+            <form className="therapist-form" onSubmit={handleTherapistSubmit}>
+              <label>
+                Full name
+                <input
+                  name="name"
+                  value={therapistForm.name}
+                  onChange={handleTherapistChange}
+                  placeholder="Dr. Emily Clark"
+                  required
+                />
+              </label>
+              <label>
+                Date of birth
+                <input name="dob" type="date" value={therapistForm.dob} onChange={handleTherapistChange} required />
+              </label>
+              <label>
+                Phone
+                <input
+                  name="phone"
+                  value={therapistForm.phone}
+                  onChange={handleTherapistChange}
+                  placeholder="555-123-4567"
+                  required
+                />
+              </label>
+              <label>
+                Specialty
+                <input
+                  name="specialty"
+                  value={therapistForm.specialty}
+                  onChange={handleTherapistChange}
+                  placeholder="Shoulder Rehab"
+                  required
+                />
+              </label>
+              <label>
+                Username
+                <input
+                  name="username"
+                  value={therapistForm.username}
+                  onChange={handleTherapistChange}
+                  placeholder="therapist@example.com"
+                  required
+                />
+              </label>
+              {therapistStatus && (
+                <p className={`status ${therapistStatus.variant}`}>{therapistStatus.message}</p>
+              )}
+              {createdTherapist && (
+                <div className="temp-credentials">
+                  <p>
+                    <strong>Username:</strong> {createdTherapist.username}
+                  </p>
+                  <p>
+                    <strong>Temp password:</strong> {createdTherapist.tempPassword}
+                  </p>
+                </div>
+              )}
+              <button type="submit" disabled={therapistLoading} aria-busy={therapistLoading}>
+                {therapistLoading ? 'Creating…' : 'Create therapist'}
+              </button>
+            </form>
           </div>
         </div>
       )}

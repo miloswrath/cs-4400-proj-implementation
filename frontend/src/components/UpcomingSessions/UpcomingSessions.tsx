@@ -16,13 +16,20 @@ type UpcomingSessionsProps = {
   sessions: UpcomingSession[];
   loading: boolean;
   onEdit: (session: UpcomingSession) => void;
+  queryTitle: string;
+  querySQL: string;
+  onShowQuery: (title: string, query: string) => void;
 };
 
-const UpcomingSessions = ({ sessions, loading, onEdit }: UpcomingSessionsProps) => (
+const UpcomingSessions = ({ sessions, loading, onEdit, queryTitle, querySQL, onShowQuery }: UpcomingSessionsProps) => (
   <section className="upcoming-card">
     <div className="upcoming-header">
       <p className="eyebrow">Upcoming</p>
-      <h2>Your scheduled visits</h2>
+      <h2>
+        <button type="button" className="panel-title-button" onClick={() => onShowQuery(queryTitle, querySQL)}>
+          {queryTitle}
+        </button>
+      </h2>
       <p>Modify details any time before your appointment.</p>
     </div>
 

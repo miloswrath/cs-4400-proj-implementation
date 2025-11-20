@@ -103,12 +103,17 @@ const Login = () => {
         patientId: data.patientId ?? null,
         patientName: data.patientName ?? null,
         needsProfileCompletion: data.needsProfileCompletion ?? false,
+        staffId: data.staffId ?? null,
+        therapistName: data.therapistName ?? null,
+        needsPasswordReset: data.needsPasswordReset ?? false,
       });
 
       if (data.role === 'pending') {
         navigate('/onboarding', { replace: true });
       } else if (data.role === 'patient') {
         navigate('/patient', { replace: true });
+      } else if (data.role === 'therapist') {
+        navigate('/therapist', { replace: true });
       } else if (data.role === 'admin') {
         navigate('/admin', { replace: true });
       } else {

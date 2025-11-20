@@ -22,9 +22,20 @@ type ScheduleSessionProps = {
   therapistsLoading?: boolean;
   therapistsError?: string | null;
   onScheduled?: () => void;
+  queryTitle: string;
+  querySQL: string;
+  onShowQuery: (title: string, query: string) => void;
 };
 
-const ScheduleSession = ({ therapists, therapistsLoading = false, therapistsError, onScheduled }: ScheduleSessionProps) => {
+const ScheduleSession = ({
+  therapists,
+  therapistsLoading = false,
+  therapistsError,
+  onScheduled,
+  queryTitle,
+  querySQL,
+  onShowQuery,
+}: ScheduleSessionProps) => {
   const { user } = useAuth();
   const [selectedTherapist, setSelectedTherapist] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
@@ -122,7 +133,11 @@ const ScheduleSession = ({ therapists, therapistsLoading = false, therapistsErro
     <section className="schedule-card">
       <div className="schedule-header">
         <p className="eyebrow">New session</p>
-        <h2>Book your next visit</h2>
+        <h2>
+          <button type="button" className="panel-title-button" onClick={() => onShowQuery(queryTitle, querySQL)}>
+            {queryTitle}
+          </button>
+        </h2>
         <p>Choose a therapist, pick a time, and tell us how you’re feeling today.</p>
         {therapistsError && <p className="status error">{therapistsError}</p>}
       </div>

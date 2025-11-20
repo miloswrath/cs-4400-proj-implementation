@@ -75,6 +75,18 @@ CREATE TABLE Sessions (
     CONSTRAINT uq_patient_sessiondate UNIQUE (PatientID, SessionDate)
 );
 
+CREATE TABLE SessionAudit (
+    AuditID INT PRIMARY KEY AUTO_INCREMENT,
+    SessionID INT NOT NULL,
+    OldStatus ENUM('Scheduled','Completed','Canceled','No-Show') NOT NULL,
+    NewStatus ENUM('Scheduled','Completed','Canceled','No-Show') NOT NULL,
+    ChangedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_audit_session
+        FOREIGN KEY (SessionID) REFERENCES Sessions(SessionID)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
 CREATE TABLE Referrals (
     ReferralID INT PRIMARY KEY AUTO_INCREMENT,
     PatientID INT NOT NULL,
@@ -137,6 +149,7 @@ CREATE TABLE Users (
     Role ENUM('patient','staff','therapist','admin') NOT NULL DEFAULT 'patient',
     PatientID INT NULL UNIQUE,
     StaffID INT NULL UNIQUE,
+    NeedsPasswordReset TINYINT(1) NOT NULL DEFAULT 0,
     CreatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UpdatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_users_patient
@@ -146,12 +159,7 @@ CREATE TABLE Users (
     CONSTRAINT fk_users_staff
         FOREIGN KEY (StaffID) REFERENCES Staff(StaffID)
         ON UPDATE CASCADE
-        ON DELETE CASCADE,
-    CONSTRAINT chk_users_owner CHECK (
-        (PatientID IS NOT NULL AND StaffID IS NULL)
-        OR (PatientID IS NULL AND StaffID IS NOT NULL)
-        OR (PatientID IS NULL AND StaffID IS NULL)
-    )
+        ON DELETE CASCADE
 );
 
 -- =========================
@@ -197,6 +205,11 @@ INSERT INTO Sessions (PatientID, TherapistID, SessionDate, Status, PainPre, Pain
 (4, 3, '2025-10-13', 'Canceled',  0, 0, 'Patient canceled due to illness'),
 (5, 1, '2025-10-14', 'Completed', 8, 5, 'Pain management and mobility work');
 
+INSERT INTO SessionAudit (SessionID, OldStatus, NewStatus)
+VALUES
+(1, 'Scheduled', 'Completed'),
+(2, 'Scheduled', 'Completed');
+
 -- Referrals
 -- Use internal referrer when it’s one of the therapists; otherwise use external name.
 INSERT INTO Referrals (PatientID, DxCode, ReferralDate, ReferringProvider) VALUES
@@ -221,3 +234,108 @@ INSERT INTO OutcomeMeasures (PatientID, MeasureName, Score, TakenOn, Notes) VALU
 (3, 'TUG', 12.30, '2025-10-17', 'Within normal range'),
 (4, 'ODI', 30.00, '2025-10-18', 'Severe pain reported'),
 (5, 'LEFS', 70.00, '2025-10-19', 'Good progress in strength and endurance');
+
+-- =========================
+-- Relational views for analytics and scheduling
+-- =========================
+DROP VIEW IF EXISTS vw_patient_upcoming_sessions;
+CREATE VIEW vw_patient_upcoming_sessions AS
+SELECT Sessions.SessionID,
+       Sessions.PatientID,
+       Sessions.SessionDate,
+       Sessions.SessionTime,
+       Sessions.Status,
+       Sessions.PainPre,
+       Sessions.Notes,
+       Sessions.TherapistID,
+       Staff.StaffName AS TherapistName,
+       Therapist.Specialty
+FROM Sessions
+INNER JOIN Therapist ON Therapist.StaffID = Sessions.TherapistID
+INNER JOIN Staff ON Staff.StaffID = Therapist.StaffID
+WHERE Sessions.Status = 'Scheduled'
+  AND Sessions.SessionDate >= CURDATE();
+
+DROP VIEW IF EXISTS vw_patient_past_sessions;
+CREATE VIEW vw_patient_past_sessions AS
+SELECT Sessions.SessionID,
+       Sessions.PatientID,
+       Sessions.SessionDate,
+       Sessions.SessionTime,
+       Sessions.Status,
+       Sessions.PainPre,
+       Sessions.Notes,
+       Sessions.TherapistID,
+       Staff.StaffName AS TherapistName,
+       Therapist.Specialty
+FROM Sessions
+INNER JOIN Therapist ON Therapist.StaffID = Sessions.TherapistID
+INNER JOIN Staff ON Staff.StaffID = Therapist.StaffID
+WHERE Sessions.SessionDate < CURDATE()
+   OR Sessions.Status <> 'Scheduled';
+
+DROP VIEW IF EXISTS vw_therapist_schedule;
+CREATE VIEW vw_therapist_schedule AS
+SELECT Sessions.SessionID,
+       Sessions.TherapistID,
+       Sessions.PatientID,
+       Patients.Name AS PatientName,
+       Sessions.SessionDate,
+       Sessions.SessionTime,
+       Sessions.Status,
+       Sessions.PainPre,
+       Sessions.Notes
+FROM Sessions
+INNER JOIN Patients ON Patients.PatientID = Sessions.PatientID;
+
+DROP VIEW IF EXISTS vw_outcome_progress;
+CREATE VIEW vw_outcome_progress AS
+SELECT OutcomeMeasures.PatientID,
+       Patients.Name AS PatientName,
+       OutcomeMeasures.MeasureName,
+       MIN(OutcomeMeasures.Score) AS MinScore,
+       MAX(OutcomeMeasures.Score) AS MaxScore,
+       COUNT(*) AS Measurements
+FROM OutcomeMeasures
+INNER JOIN Patients ON Patients.PatientID = OutcomeMeasures.PatientID
+GROUP BY OutcomeMeasures.PatientID, Patients.Name, OutcomeMeasures.MeasureName;
+
+-- =========================
+-- Triggers to enforce business rules
+-- =========================
+DROP TRIGGER IF EXISTS trg_sessionexercise_default_resistance;
+DELIMITER $$
+CREATE TRIGGER trg_sessionexercise_default_resistance
+BEFORE INSERT ON SessionExercises
+FOR EACH ROW
+BEGIN
+    IF NEW.Resistance IS NULL OR NEW.Resistance = '' THEN
+        SET NEW.Resistance = 'Bodyweight';
+    END IF;
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_outcome_score_insert_check;
+DELIMITER $$
+CREATE TRIGGER trg_outcome_score_insert_check
+BEFORE INSERT ON OutcomeMeasures
+FOR EACH ROW
+BEGIN
+    IF NEW.Score < 0 OR NEW.Score > 100 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Outcome score must be between 0 and 100';
+    END IF;
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_session_status_audit;
+DELIMITER $$
+CREATE TRIGGER trg_session_status_audit
+AFTER UPDATE ON Sessions
+FOR EACH ROW
+BEGIN
+    IF NEW.Status <> OLD.Status THEN
+        INSERT INTO SessionAudit (SessionID, OldStatus, NewStatus)
+        VALUES (NEW.SessionID, OLD.Status, NEW.Status);
+    END IF;
+END$$
+DELIMITER ;
