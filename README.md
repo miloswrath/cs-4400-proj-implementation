@@ -9,7 +9,7 @@ Prototype patient portal for a physical-therapy clinic. It pairs a Vite/React fr
 
 See the dedicated READMEs in `frontend/` and `backend/` for deeper dives into the tooling and architecture choices.
 
-## Quick start for non-technical teammates
+## Quick start
 These steps assume you're on macOS, Windows, or a mainstream Linux desktop. Everything happens in a terminal, but you can copy/paste the commands exactly as written.
 
 ### 1. Install the two prerequisites
@@ -20,7 +20,7 @@ These steps assume you're on macOS, Windows, or a mainstream Linux desktop. Ever
 Open a terminal window inside this project folder and run:
 
 ```bash
-docker compose up -d
+docker compose up --build -d
 ```
 
 The first run downloads the MySQL image, creates the `PT_Clinic` database, and loads all of the fictional seed data. Docker keeps running in the background; you only have to redo this step if you shut Docker down completely.
@@ -78,4 +78,3 @@ If something goes wrong, stop the running commands with `Ctrl+C`, fix any typos,
 - `backend/README.md` covers the Express server, database helpers, and available endpoints.
 - `sql/` shows exactly how the schema is created and how the fake data gets loaded.
 
-Everything here is for demonstration and training purposes; please do not load real PHI until the project has been reviewed for compliance.

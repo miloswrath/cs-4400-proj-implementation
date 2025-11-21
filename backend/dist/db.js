@@ -119,6 +119,13 @@ FROM OutcomeMeasures
 INNER JOIN Patients ON Patients.PatientID = OutcomeMeasures.PatientID
 GROUP BY OutcomeMeasures.PatientID, Patients.Name, OutcomeMeasures.MeasureName;
 `;
+let hasLoggedTriggerPrivilegeWarning = false;
+const logTriggerPrivilegeWarning = () => {
+    if (!hasLoggedTriggerPrivilegeWarning) {
+        console.warn('Skipping trigger creation due to insufficient privileges. Please set log_bin_trust_function_creators=1 if triggers are needed.');
+        hasLoggedTriggerPrivilegeWarning = true;
+    }
+};
 async function verifyDatabase() {
     const [rows] = await pool.query('SELECT DATABASE() AS db');
     const firstRow = rows.length > 0 ? rows[0] : undefined;
@@ -201,27 +208,43 @@ async function ensureSessionsSchema() {
     }
 }
 exports.default = pool;
+const runTriggerStatement = async (statement) => {
+    try {
+        await pool.query(statement);
+        return true;
+    }
+    catch (error) {
+        const mysqlError = error;
+        if (mysqlError?.code === 'ER_BINLOG_CREATE_ROUTINE_NEED_SUPER') {
+            logTriggerPrivilegeWarning();
+            return false;
+        }
+        throw error;
+    }
+};
+const ensureTrigger = async (triggerName, statement) => {
+    try {
+        const executed = await runTriggerStatement(statement);
+        if (!executed) {
+            return;
+        }
+    }
+    catch (error) {
+        const mysqlError = error;
+        if (mysqlError?.code !== 'ER_TRG_ALREADY_EXISTS') {
+            throw error;
+        }
+        await pool.query(`DROP TRIGGER IF EXISTS ${triggerName}`);
+        await runTriggerStatement(statement);
+    }
+};
 async function ensureDerivedStructures() {
     await pool.query(CREATE_SESSION_AUDIT_TABLE_SQL);
     await pool.query(VIEW_PATIENT_UPCOMING_SQL);
     await pool.query(VIEW_PATIENT_PAST_SQL);
     await pool.query(VIEW_THERAPIST_SCHEDULE_SQL);
     await pool.query(VIEW_OUTCOME_PROGRESS_SQL);
-    const runTriggerStatement = async (statement) => {
-        try {
-            await pool.query(statement);
-        }
-        catch (error) {
-            const mysqlError = error;
-            if (mysqlError?.code === 'ER_BINLOG_CREATE_ROUTINE_NEED_SUPER') {
-                console.warn('Skipping trigger creation due to insufficient privileges. Please set log_bin_trust_function_creators=1 if triggers are needed.');
-                return;
-            }
-            throw error;
-        }
-    };
-    await pool.query('DROP TRIGGER IF EXISTS trg_sessionexercise_default_resistance');
-    await runTriggerStatement(`
+    await ensureTrigger('trg_sessionexercise_default_resistance', `
     CREATE TRIGGER trg_sessionexercise_default_resistance
     BEFORE INSERT ON SessionExercises
     FOR EACH ROW
@@ -231,8 +254,7 @@ async function ensureDerivedStructures() {
       END IF;
     END
   `);
-    await pool.query('DROP TRIGGER IF EXISTS trg_outcome_score_insert_check');
-    await runTriggerStatement(`
+    await ensureTrigger('trg_outcome_score_insert_check', `
     CREATE TRIGGER trg_outcome_score_insert_check
     BEFORE INSERT ON OutcomeMeasures
     FOR EACH ROW
@@ -242,8 +264,7 @@ async function ensureDerivedStructures() {
       END IF;
     END
   `);
-    await pool.query('DROP TRIGGER IF EXISTS trg_session_status_audit');
-    await runTriggerStatement(`
+    await ensureTrigger('trg_session_status_audit', `
     CREATE TRIGGER trg_session_status_audit
     AFTER UPDATE ON Sessions
     FOR EACH ROW

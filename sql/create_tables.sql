@@ -57,10 +57,12 @@ CREATE TABLE Sessions (
     PatientID INT NOT NULL,
     TherapistID INT NOT NULL,               -- FK to Therapist (StaffID)
     SessionDate DATE NOT NULL,
+    SessionTime TIME NOT NULL DEFAULT '08:00:00',
     Status ENUM('Scheduled','Completed','Canceled','No-Show') NOT NULL DEFAULT 'Scheduled',
     PainPre TINYINT NULL,
     PainPost TINYINT NULL,
     Notes TEXT,
+    CONSTRAINT chk_session_time CHECK (SessionTime BETWEEN '08:00:00' AND '16:00:00'),
     CONSTRAINT chk_painpre  CHECK (PainPre  BETWEEN 0 AND 10 OR PainPre  IS NULL),
     CONSTRAINT chk_painpost CHECK (PainPost BETWEEN 0 AND 10 OR PainPost IS NULL),
     CONSTRAINT fk_session_patient
@@ -72,7 +74,8 @@ CREATE TABLE Sessions (
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
     -- Optional business rule: at most one session per patient per date
-    CONSTRAINT uq_patient_sessiondate UNIQUE (PatientID, SessionDate)
+    CONSTRAINT uq_patient_sessiondate UNIQUE (PatientID, SessionDate),
+    CONSTRAINT uq_therapist_slot UNIQUE (TherapistID, SessionDate, SessionTime)
 );
 
 CREATE TABLE SessionAudit (
@@ -198,12 +201,12 @@ INSERT INTO Exercises (Name, BodyRegion, Difficulty) VALUES
 ('Plank',        'Core',    5);
 
 -- Sessions (TherapistID must reference Therapist.StaffID: 1,3,5)
-INSERT INTO Sessions (PatientID, TherapistID, SessionDate, Status, PainPre, PainPost, Notes) VALUES
-(1, 1, '2025-10-10', 'Completed', 7, 4, 'Initial evaluation and assessment'),
-(2, 3, '2025-10-11', 'Completed', 6, 3, 'Manual therapy and stretching'),
-(3, 5, '2025-10-12', 'Scheduled', 5, 5, 'Follow-up session planned'),
-(4, 3, '2025-10-13', 'Canceled',  0, 0, 'Patient canceled due to illness'),
-(5, 1, '2025-10-14', 'Completed', 8, 5, 'Pain management and mobility work');
+INSERT INTO Sessions (PatientID, TherapistID, SessionDate, SessionTime, Status, PainPre, PainPost, Notes) VALUES
+(1, 1, '2025-10-10', '09:00:00', 'Completed', 7, 4, 'Initial evaluation and assessment'),
+(2, 3, '2025-10-11', '10:00:00', 'Completed', 6, 3, 'Manual therapy and stretching'),
+(3, 5, '2025-10-12', '13:30:00', 'Scheduled', 5, 5, 'Follow-up session planned'),
+(4, 3, '2025-10-13', '08:30:00', 'Canceled',  0, 0, 'Patient canceled due to illness'),
+(5, 1, '2025-10-14', '11:00:00', 'Completed', 8, 5, 'Pain management and mobility work');
 
 INSERT INTO SessionAudit (SessionID, OldStatus, NewStatus)
 VALUES

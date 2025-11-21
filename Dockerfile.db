@@ -1,5 +1,8 @@
 FROM mysql:8.3
 
+# Allow the app's triggers/functions to be created without SUPER privileges.
+COPY mysql/conf.d/log_bin_trust.cnf /etc/mysql/conf.d/log_bin_trust.cnf
+
 # Copy the schema/seed scripts so the MySQL entrypoint runs them on first boot.
 COPY sql/create_tables.sql /docker-entrypoint-initdb.d/01_create_tables.sql
 COPY sql/02_seed_data.sql /docker-entrypoint-initdb.d/02_seed_data.sql
